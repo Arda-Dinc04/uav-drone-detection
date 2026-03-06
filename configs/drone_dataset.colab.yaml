@@ -1,0 +1,24 @@
+# Colab-friendly Ultralytics dataset config for a single-class drone detector.
+# Expected dataset layout:
+#
+# /content/drone_dataset/
+#   images/
+#     train/
+#     val/
+#     test/
+#   labels/
+#     train/
+#     val/
+#     test/
+#
+# Each label file should use YOLO detection format:
+# class_id x_center y_center width height
+# Values must be normalized to [0, 1].
+
+path: /content/drone_dataset
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: drone

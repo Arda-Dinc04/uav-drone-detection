@@ -1,0 +1,26 @@
+[project]
+name = "uav-drone-detection"
+version = "0.1.0"
+description = "Drone detection and Kalman-filter tracking pipeline for UAV videos."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "datasets>=2.20.0",
+  "filterpy>=1.4.5",
+  "numpy>=1.26.0",
+  "opencv-python>=4.10.0",
+  "pandas>=2.2.0",
+  "pyarrow>=16.0.0",
+  "scipy>=1.11.0",
+  "ultralytics>=8.2.0",
+]
+
+[project.scripts]
+drone-pipeline = "drone_tracking.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["drone_tracking*"]

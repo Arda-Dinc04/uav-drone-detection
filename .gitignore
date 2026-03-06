@@ -1,0 +1,14 @@
+.venv/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+
+detections/
+runs/
+outputs/
+videos/
+frames/
+*.pt
