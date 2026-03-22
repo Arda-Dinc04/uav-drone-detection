@@ -1,125 +1,55 @@
 # UAV Drone Detection and Tracking
 
-This repository is a baseline implementation for the assignment: detect drones in every `.mp4` inside a directory, track detections with a Kalman filter, save detection-positive frames to `detections/`, and produce one tracking video per input.
+This repository contains my submission for the UAV drone detection and tracking assignment. The pipeline detects the drone in video, tracks it over time with a Kalman filter, saves detection-positive frames, and renders output videos with bounding boxes, a 2D trajectory polyline, and a smoothed heading vector.
 
-The code is intentionally configurable around the detector weights because the only part you still need to supply is a model that actually recognizes the drone itself. The pipeline already handles the rest: frame iteration, detector inference, Kalman prediction and update, trajectory rendering, and Parquet export for the Hugging Face deliverable.
+## Submission Links
 
-## Why this setup
+Add the final public links here before submitting:
 
-The assignment target is the drone object itself, not ground objects viewed from a drone. Be careful here: the official VisDrone benchmark is primarily drone-captured imagery for detecting objects such as pedestrians and vehicles, so it is not a strong default for this assignment if your class of interest is `drone`.
+1. Hugging Face dataset: `PASTE_HF_DATASET_LINK_HERE`
+2. YouTube video for `drone_video_1_tracked.mp4`: `https://youtu.be/43nhXW6dSFE`
+3. YouTube video for `drone_video_2_tracked.mp4`: `https://youtu.be/hZzecY-NcCc`
 
-The practical path is:
+## Deliverables
 
-1. Pick or build a drone-as-object dataset in YOLO or COCO format.
-2. Fine-tune a detector such as Ultralytics YOLO on that dataset.
-3. Run this repository against the assignment videos.
-4. Export the detection-positive frames into Parquet and upload the tracking outputs.
+Included in this repository:
 
-## Repository layout
+1. Detection-positive sample frames in [detections](/Users/ardadinc/Documents/New%20project/detections) with a Parquet export at [detections.parquet](/Users/ardadinc/Documents/New%20project/detections/detections.parquet)
+2. Output tracking videos for the two official course videos in [outputs/videos](/Users/ardadinc/Documents/New%20project/outputs/videos)
+3. Additional benchmark tracking videos on extra test cases in [outputs_extra/videos](/Users/ardadinc/Documents/New%20project/outputs_extra/videos)
+4. A consolidated set of presentation-ready tracked videos in [final_videos](/Users/ardadinc/Documents/New%20project/final_videos)
+5. Source videos from the assignment in [videos](/Users/ardadinc/Documents/New%20project/videos) and extra benchmark clips in [videos_extra](/Users/ardadinc/Documents/New%20project/videos_extra)
+6. The full code pipeline in [drone_tracking](/Users/ardadinc/Documents/New%20project/drone_tracking)
 
-```text
-drone_tracking/
-  cli.py
-  detector.py
-  export.py
-  models.py
-  pipeline.py
-  tracker.py
-configs/
-  drone_dataset.example.yaml
-README.md
-pyproject.toml
-```
+## Detector Choice
 
-## Environment setup
+The final detector used for the submission run is a pretrained Hugging Face checkpoint:
 
-Create a virtual environment and install the project:
+1. Model: `AeroYOLO_best.pt`
+2. Source: `QuincySorrentino/AeroYOLO`
+3. Detector family: Ultralytics YOLO
+4. Class map: `aircraft`, `drone`, `helicopter`
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-```
+I used this model because the generic COCO checkpoint (`yolo11n.pt`) consistently labeled the flying target as `airplane`, `bird`, or `kite` instead of `drone`. AeroYOLO is not perfect, but it is a stronger drone-focused starting point and produced consistent `drone` detections on the course video and several additional test clips.
 
-Install `ffmpeg` if it is not already available:
+Final inference settings used for submission outputs:
 
-```bash
-brew install ffmpeg
-```
+1. Confidence threshold: `0.08`
+2. Target label kept for the assignment output: `drone`
+3. Input handling: every `.mp4` in a directory is processed automatically
+4. For weak official clips, I also tested a lower threshold of `0.08` to recover additional drone detections
 
-## Download the test videos
+## Dataset Choice
 
-Use `yt-dlp` exactly as required by the assignment:
+For training exploration, I evaluated the `ChinnaSAMY1/drone-detection-dataset` Hugging Face dataset because it contains labeled drone bounding boxes and is distributed in Parquet format, which makes it straightforward to load and convert.
 
-```bash
-brew install yt-dlp
-mkdir -p videos
-yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]" \
-  -o "videos/drone_video_1.mp4" \
-  "https://www.youtube.com/watch?v=DhmZ6W1UAv4"
-yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]" \
-  -o "videos/drone_video_2.mp4" \
-  "https://www.youtube.com/watch?v=YrydHPwRelI"
-```
+I explicitly avoided using VisDrone as the primary detector-training source because it is mainly a benchmark for objects seen from drone-mounted cameras, not the drone itself as the target object.
 
-## Detector recommendation
+I did not complete a full custom fine-tune for the final submission because the full training run was too heavy for the available Colab budget and runtime. Instead, I switched to a pretrained drone-specific detector and focused on validating the end-to-end detection and tracking pipeline.
 
-Use Ultralytics YOLO first. It is the fastest way to get a custom drone detector trained and integrated into the rest of the assignment. A good workflow is:
+## Kalman Filter Design
 
-1. Export or convert your dataset to YOLO format.
-2. Fill in [`configs/drone_dataset.example.yaml`](/Users/ardadinc/Documents/New project/configs/drone_dataset.example.yaml) with the real dataset paths.
-3. Fine-tune from a pretrained checkpoint such as `yolo11n.pt`, `yolo11s.pt`, or your preferred YOLO variant.
-
-Example:
-
-```bash
-yolo detect train \
-  model=yolo11n.pt \
-  data=configs/drone_dataset.example.yaml \
-  epochs=50 \
-  imgsz=960
-```
-
-If you already have a trained checkpoint from Roboflow, Hugging Face, or a prior experiment, you can use it directly with this repository. The runtime assumes the model exposes a `drone` class label. If your label name differs, pass `--target-label`.
-
-For the recommended Colab fine-tuning path, exact dataset layout, and balanced training defaults, use [TRAINING.md](/Users/ardadinc/Documents/New%20project/TRAINING.md).
-
-## Run the assignment pipeline
-
-Process every `.mp4` in `videos/`:
-
-```bash
-drone-pipeline process \
-  --input-dir videos \
-  --weights runs/detect/train/weights/best.pt \
-  --target-label drone \
-  --output-dir outputs \
-  --detections-dir detections
-```
-
-Useful overrides:
-
-```bash
-drone-pipeline process \
-  --input-dir videos \
-  --weights path/to/best.pt \
-  --device mps \
-  --conf-threshold 0.20 \
-  --frame-step 1 \
-  --max-distance 100 \
-  --max-missed-frames 10
-```
-
-What the pipeline writes:
-
-1. `detections/<video_name>/frame_*.jpg`
-2. `detections/manifest.jsonl`
-3. `outputs/videos/<video_name>_tracked.mp4`
-4. `outputs/rendered_frames/<video_name>/frame_*.jpg`
-
-## Tracking design
-
-The tracker is a simple Kalman-based multi-object tracker built with `filterpy`.
+The tracker is implemented with `filterpy` in [tracker.py](/Users/ardadinc/Documents/New%20project/drone_tracking/tracker.py).
 
 State vector:
 
@@ -129,22 +59,130 @@ State vector:
 
 Where:
 
-1. `x, y` are the bounding-box center coordinates in pixels.
-2. `vx, vy` are center velocities in pixels per frame.
+1. `x, y` are the pixel coordinates of the bounding-box center
+2. `vx, vy` are the center velocities in pixels per frame
 
-Per frame:
+Tracking loop:
 
-1. Every live track predicts its next center using a constant-velocity motion model.
-2. New detections are associated to predicted tracks using Hungarian matching on Euclidean center distance.
-3. Matched tracks receive a Kalman update.
-4. Unmatched tracks continue as predictions for a limited number of missed frames.
-5. Trajectories are rendered as 2D polylines over the output frames.
+1. Predict the next state with a constant-velocity motion model
+2. Associate detections to predicted tracks with Hungarian matching on Euclidean distance
+3. Update matched tracks with the current detector observation
+4. Keep unmatched tracks alive briefly so the trajectory does not collapse on short missed detections
 
-The output video keeps only frames where the detector or tracker says a drone is still present. Detection boxes are drawn in green. Predicted-only boxes are drawn in orange.
+Tracker parameters used in the current pipeline:
 
-## Export the detection dataset to Parquet
+1. `max_distance = 80`
+2. `max_missed_frames = 8`
+3. `min_hits = 2`
+4. `process_noise = 5.0`
+5. `measurement_noise = 20.0`
 
-After running the detector, export the saved sample frames:
+## Trajectory and Heading Visualization
+
+Each output frame contains:
+
+1. The detector bounding box
+2. The Kalman-filtered track ID
+3. A 2D trajectory polyline showing the history of the tracked center
+4. A smoothed heading vector showing where the drone is moving next
+
+The heading vector was stabilized so it no longer expands aggressively when the raw velocity estimate spikes. The current version uses recent trajectory motion first and falls back to Kalman velocity only when needed.
+
+## Final Test Set
+
+### Course videos
+
+The two official course videos used for submission are:
+
+1. [drone_video_1.mp4](/Users/ardadinc/Documents/New%20project/videos/drone_video_1.mp4)
+2. [drone_video_2.mp4](/Users/ardadinc/Documents/New%20project/videos/drone_video_2.mp4)
+
+### Extra benchmark videos
+
+To go beyond the provided clip, I added extra drone-visible test cases in [videos_extra](/Users/ardadinc/Documents/New%20project/videos_extra):
+
+1. `mixkit_close_outdoor_drone.mp4`
+2. `mixkit_small_drone_sky.mp4`
+3. `mixkit_drone_city_spinning.mp4`
+4. `mixkit_drone_circles_abandoned_space.mp4`
+
+These extra clips were chosen to test:
+
+1. close-up drone appearance
+2. small-object detection against the sky
+3. urban clutter
+4. circular and faster motion
+
+## Results Summary
+
+### Official video results
+
+Final tracked outputs:
+
+1. [drone_video_1_tracked.mp4](/Users/ardadinc/Documents/New%20project/outputs/videos/drone_video_1_tracked.mp4)
+2. [drone_video_2_tracked.mp4](/Users/ardadinc/Documents/New%20project/outputs/videos/drone_video_2_tracked.mp4)
+
+Course-video result summary from local runs:
+
+1. `drone_video_1.mp4`: strong detection and stable tracking on the provided clip
+2. `drone_video_2.mp4`: more challenging; additional segment-level testing was used to understand where the detector succeeded and failed
+3. Output videos contain only frames where the detector/tracker kept the drone alive, matching the assignment requirement
+
+### Extra benchmark result
+
+Tracked outputs are saved in [outputs_extra/videos](/Users/ardadinc/Documents/New%20project/outputs_extra/videos), and a small curated set is also copied into [final_videos](/Users/ardadinc/Documents/New%20project/final_videos).
+
+Observed behavior from earlier evaluation of the same AeroYOLO checkpoint:
+
+1. `mixkit_drone_circles_abandoned_space.mp4`: strongest extra-case result, with stable drone detections during circular motion
+2. `mixkit_drone_city_spinning.mp4`: moderate result, drone detected but not on every frame
+3. `mixkit_small_drone_sky.mp4`: partial success, but class confusion appears when the drone becomes small
+4. `mixkit_close_outdoor_drone.mp4`: the model often sees the target but may classify it as `helicopter` or `aircraft` instead of `drone`
+
+These extra tests were useful because they exposed a real failure mode that the assignment clip alone would not show: the detector is reasonably good at finding flying objects, but not always semantically stable enough to label them as `drone`.
+
+## Failure Cases
+
+The main failure modes I observed are:
+
+1. Small drones at long range can be confused with `aircraft` or `helicopter`
+2. Some close-up consumer-drone footage is detected, but mislabeled
+3. Fast motion and background clutter can reduce detector consistency
+4. When detections drop out, the Kalman tracker can bridge short gaps, but it cannot recover indefinitely without new observations
+
+How the tracker handles misses:
+
+1. It continues predicting for up to `8` missed frames
+2. The trajectory remains visible during these short gaps
+3. Tracks are removed once the miss limit is exceeded
+
+## Commands Used
+
+Run the provided course videos:
+
+```bash
+drone-pipeline process \
+  --input-dir videos \
+  --weights pretrained_weights/AeroYOLO_best.pt \
+  --target-label drone \
+  --output-dir outputs \
+  --detections-dir detections \
+  --conf-threshold 0.08
+```
+
+Run the extra benchmark set:
+
+```bash
+drone-pipeline process \
+  --input-dir videos_extra \
+  --weights pretrained_weights/AeroYOLO_best.pt \
+  --target-label drone \
+  --output-dir outputs_extra \
+  --detections-dir detections_extra \
+  --conf-threshold 0.20
+```
+
+Export the detection-positive frames to Parquet:
 
 ```bash
 drone-pipeline export-hf \
@@ -152,21 +190,26 @@ drone-pipeline export-hf \
   --output-file detections/detections.parquet
 ```
 
-That Parquet file is the artifact you can upload as the Hugging Face dataset deliverable. The manifest includes the image plus the detection metadata for each saved frame.
+## Repository Structure
 
-## Suggested report points for `README.md`
+The final submission-relevant folders are:
 
-Your final submission README should explicitly cover:
+```text
+drone_tracking/
+videos/
+videos_extra/
+detections/
+outputs/
+outputs_extra/
+README.md
+pyproject.toml
+```
 
-1. The dataset you used and why it matches drone-as-object detection.
-2. The detector architecture, checkpoint, image size, and confidence threshold.
-3. The Kalman state vector and why you used constant velocity.
-4. The process and measurement noise values you chose.
-5. Failure cases such as small targets, motion blur, missed detections, and false positives.
-6. How many consecutive missed frames the tracker tolerates before dropping a track.
+## Next Improvements
 
-## Known limits
+If I continued this project beyond the submission, the next changes would be:
 
-This baseline does not train the detector for you. You still need to choose a drone dataset and either fine-tune or download a checkpoint that recognizes the drone itself.
-
-If your dataset contains only one drone per frame, this tracker still works. If your videos contain multiple drones, the current matching logic will maintain multiple Kalman tracks as long as the detector is consistent enough.
+1. Evaluate a stronger single-class drone model to reduce `drone` vs `helicopter` confusion
+2. Fine-tune on a smaller but more targeted drone-as-object dataset
+3. Add a class-remapping evaluation mode for exploratory testing
+4. Add simple quantitative metrics over hand-labeled benchmark clips

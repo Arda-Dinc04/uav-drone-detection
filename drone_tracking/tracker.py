@@ -85,6 +85,10 @@ class KalmanTrack:
         half_h = self.height / 2.0
         return (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
 
+    @property
+    def current_velocity(self) -> tuple[float, float]:
+        return (float(self.kf.x[2]), float(self.kf.x[3]))
+
     def predict(self) -> None:
         self.kf.predict()
         self.age += 1
@@ -117,6 +121,7 @@ class KalmanTrack:
         return TrackState(
             track_id=self.track_id,
             center=self.current_center,
+            velocity=self.current_velocity,
             bbox=self.current_bbox,
             trajectory=list(self.trajectory),
             predicted=self.last_predicted,

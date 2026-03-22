@@ -35,6 +35,7 @@ class Detection:
 class TrackState:
     track_id: int
     center: tuple[float, float]
+    velocity: tuple[float, float]
     bbox: tuple[float, float, float, float]
     trajectory: list[tuple[float, float]]
     predicted: bool

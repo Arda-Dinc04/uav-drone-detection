@@ -27,6 +27,30 @@ def _track_color(track_id: int) -> tuple[int, int, int]:
     return (int(blue), int(green), int(red))
 
 
+def _heading_endpoint(track: TrackState, arrow_length: float = 28.0) -> tuple[int, int] | None:
+    recent_points = track.trajectory[-6:]
+    dx = dy = 0.0
+    if len(recent_points) >= 2:
+        start_x, start_y = recent_points[0]
+        end_x, end_y = recent_points[-1]
+        dx = end_x - start_x
+        dy = end_y - start_y
+
+    if float(np.hypot(dx, dy)) < 1.5:
+        vx, vy = track.velocity
+        dx, dy = vx, vy
+
+    norm = float(np.hypot(dx, dy))
+    if norm < 0.75:
+        return None
+
+    scale = arrow_length / norm
+    return (
+        int(track.center[0] + dx * scale),
+        int(track.center[1] + dy * scale),
+    )
+
+
 def _draw_detections(frame, detections: list[Detection]) -> None:
     for detection in detections:
         x1, y1, x2, y2 = (int(detection.x1), int(detection.y1), int(detection.x2), int(detection.y2))
@@ -63,6 +87,18 @@ def _draw_tracks(frame, tracks: list[TrackState]) -> None:
             2,
             cv2.LINE_AA,
         )
+
+        end_point = _heading_endpoint(track)
+        if end_point is not None:
+            cv2.arrowedLine(
+                frame,
+                (cx, cy),
+                end_point,
+                color,
+                2,
+                cv2.LINE_AA,
+                tipLength=0.25,
+            )
 
         if track.predicted:
             x1, y1, x2, y2 = (int(value) for value in track.bbox)

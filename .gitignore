@@ -12,3 +12,9 @@ outputs/
 videos/
 frames/
 *.pt
+
+# Local experiment / extra outputs (keep repo small)
+detections_extra/
+outputs_extra/
+videos_extra/
+final_videos/
