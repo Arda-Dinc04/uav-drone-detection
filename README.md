@@ -6,9 +6,9 @@ This repository contains my submission for the UAV drone detection and tracking 
 
 Add the final public links here before submitting:
 
-1. Hugging Face dataset: `https://huggingface.co/datasets/ArdaDinc/UAV-Drone-Detection-Tracking/blob/main/detections.parquet`
-2. YouTube video for `drone_video_1_tracked.mp4`: `https://youtu.be/9lu7vpjpbEA`
-3. YouTube video for `drone_video_2_tracked.mp4`: `https://youtu.be/PPAf5-mcQw0`
+1. Hugging Face dataset: https://huggingface.co/datasets/ArdaDinc/UAV-Drone-Detection-Tracking/blob/main/detections.parquet
+2. YouTube video for `drone_video_1_tracked.mp4`: https://youtu.be/9lu7vpjpbEA
+3. YouTube video for `drone_video_2_tracked.mp4`: https://youtu.be/PPAf5-mcQw0
 
 ## Deliverables
 
